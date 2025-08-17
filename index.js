@@ -1,6 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-    // --- MOBILE MENU TOGGLE ---
     const mobileMenuButton = document.querySelector('.mobile-menu-button');
     const mobileMenu = document.querySelector('.mobile-menu');
 
@@ -10,14 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- SMOOTH SCROLL & ACTIVE LINK LOGIC ---
     const sections = document.querySelectorAll('section[id]');
     const navLinks = document.querySelectorAll('.nav-link');
-    const mobileNavLinks = document.querySelectorAll('.mobile-nav-link');
-    const allLinks = [...navLinks, ...mobileNavLinks];
+    const allLinks = [...document.querySelectorAll('.nav-link'), ...document.querySelectorAll('.mobile-nav-link')];
     const navHeight = document.querySelector('.navbar').offsetHeight;
 
-    // Function to handle smooth scrolling
     const smoothScroll = (e) => {
         e.preventDefault();
         const targetId = e.currentTarget.getAttribute('href');
@@ -33,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 behavior: 'smooth'
             });
 
-            // Close mobile menu if it's open
             if (mobileMenu.classList.contains('open')) {
                 mobileMenu.classList.remove('open');
             }
@@ -41,10 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     
     allLinks.forEach(link => {
-        link.addEventListener('click', smoothScroll);
+        if (link.getAttribute('href').startsWith('#')) {
+            link.addEventListener('click', smoothScroll);
+        }
     });
 
-    // --- ACTIVE LINK HIGHLIGHTING USING INTERSECTION OBSERVER ---
     const observerOptions = {
         root: null,
         rootMargin: `-${navHeight}px 0px -70% 0px`,
@@ -68,23 +63,77 @@ document.addEventListener('DOMContentLoaded', () => {
     const observer = new IntersectionObserver(observerCallback, observerOptions);
     sections.forEach(section => observer.observe(section));
 
+    const copyButtons = document.querySelectorAll('.contact-button[data-copy]');
 
-    // --- CONTACT FORM SUBMISSION ---
+    copyButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            const textToCopy = button.getAttribute('data-copy');
+            const contactTextSpan = button.querySelector('.contact-text');
+            const originalText = contactTextSpan.textContent;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                contactTextSpan.textContent = 'Copied!';
+                button.classList.add('copied');
+                
+                setTimeout(() => {
+                    contactTextSpan.textContent = originalText;
+                    button.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+                contactTextSpan.textContent = 'Copy Failed';
+                 setTimeout(() => {
+                    contactTextSpan.textContent = originalText;
+                }, 2000);
+            });
+        });
+    });
+
     const contactForm = document.getElementById('contact-form');
+    const formResult = document.getElementById('form-result');
+
     if (contactForm) {
         contactForm.addEventListener('submit', function(e) {
             e.preventDefault();
             
-            const name = document.getElementById('name').value;
-            const email = document.getElementById('email').value;
-            const message = document.getElementById('message').value;
-            
-            // In a real application, you would send this to a server
-            console.log('Form Submitted:', { name, email, message });
-            
-            alert('Thank you for your message! I will get back to you soon.');
-            
-            this.reset();
+            const formData = new FormData(contactForm);
+            const object = Object.fromEntries(formData);
+            const json = JSON.stringify(object);
+
+            formResult.innerHTML = "Sending...";
+            formResult.style.color = 'var(--text-muted)';
+
+            fetch('https://api.web3forms.com/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: json
+                })
+                .then(async (response) => {
+                    let jsonResponse = await response.json();
+                    if (response.status == 200) {
+                        formResult.innerHTML = "Message sent successfully!";
+                        formResult.style.color = '#34d399';
+                    } else {
+                        console.log(response);
+                        formResult.innerHTML = jsonResponse.message;
+                        formResult.style.color = '#f87171';
+                    }
+                })
+                .catch(error => {
+                    console.log(error);
+                    formResult.innerHTML = "Something went wrong!";
+                    formResult.style.color = '#f87171';
+                })
+                .then(function() {
+                    contactForm.reset();
+                    setTimeout(() => {
+                        formResult.innerHTML = '';
+                    }, 5000);
+                });
         });
     }
 });
